@@ -8,6 +8,8 @@ var fs = require('fs'),
 var C = {}
 C.fileName = '\\data\\gCycle-data\\Takeout\\Location History\\test.json';
 C.mongoURL = 'mongodb://localhost:27017/gCycle';
+C.minIntervalForNew = 3600000; // One hour
+C.minConfidence = 1;
 
 
 /**
@@ -73,22 +75,34 @@ function filterData(db, rawCol) {
             }
         ]);
 
-        filtered.toArray(function(err, filteredData){
+        filtered.toArray(function (err, filteredData) {
             test.equal(null, err);
             // test(filteredData.length > 0);
             // console.dir(filteredData);
 
-            filteredCol.insertMany(filteredData, function (err, r){
+            filteredCol.insertMany(filteredData, function (err, r) {
                 test.equal(null, err);
                 test.equal(filteredData.length, r.insertedCount);
                 console.log(r.insertedCount + ' records inserted.');
-                process.exit(); /////////////////////////////////
+                groupByDate(db, filteredCol);
             });
         });
 
     });
 }
 
+/**
+ * groupByDate(db, filteredCol)
+ *
+ * Create a collection grouped by date
+ * TODO: flatten and filter ONLY onBicycle events
+ *
+ * @param MongoDB.Db db: The database in which to store the results
+ * @param MongoDB.Collection filteredCol - The collection we are operating on
+ */
+function groupByDate(db, filteredCol) {
+
+}
 
 /* Main entry point */
 
@@ -98,7 +112,7 @@ MongoClient.connect(C.mongoURL, function (err, db) {
     // Access the desired collection
     var rawCol = db.collection('rawData');
 
-    /* TODO: SKIPPING FOR NOW! */
+    /* TODO: SKIPPING FOR NOW!
     // Delete all records, then if all is well add the new records
     console.log("Deleting records...");
     rawCol.deleteMany({}, function (err) {
@@ -107,8 +121,9 @@ MongoClient.connect(C.mongoURL, function (err, db) {
         readFile(C.fileName, db, rawCol);
 
     });
+    //*/
     // filterData(db, rawCol); // Remove this line when reading from the file
-
+    //*/
 
 });
 
