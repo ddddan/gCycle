@@ -1,11 +1,12 @@
 /* PACKAGES */
-var fs = require('fs'),
+var util = require('util'),
+    fs = require('fs'),
     MongoClient = require('mongodb').MongoClient,
     JSONStream = require('JSONStream'),
     test = require('assert');
 
 /* GLOBALS - CONSTANTS */
-var C = {}
+var C = {};
 C.fileName = '\\data\\gCycle-data\\Takeout\\Location History\\test.json';
 C.mongoURL = 'mongodb://localhost:27017/gCycle';
 C.minIntervalForNew = 3600000; // One hour
@@ -22,18 +23,18 @@ C.minConfidence = 1;
  * @return object: A reduced data set
  */
 function readFile(fileName, db, rawCol) {
-    console.log("Reading file...");
+    console.log('Reading file...');
     fs.createReadStream(fileName)
         .pipe(JSONStream.parse('locations'))
         .on('data', function (data) {
-            console.log("Adding " + data.length + " records...");
+            console.log('Adding ' + data.length + ' records...');
             rawCol.insertMany(data, function (err, r) {
                 test.equal(null, err);
                 test.equal(data.length, r.insertedCount);
             });
         })
         .once('end', function () {
-            console.log("Done.");
+            console.log('Done.');
             filterData(db, rawCol);
         });
 }
@@ -49,7 +50,7 @@ function readFile(fileName, db, rawCol) {
  *
  */
 function filterData(db, rawCol) {
-    console.log("Filtering data...");
+    console.log('Filtering data...');
 
     // Access the filtered collection
     var filteredCol = db.collection('filteredData');
@@ -61,16 +62,22 @@ function filterData(db, rawCol) {
         // Insert into the filtered collection any records with onBicycle
         var filtered = rawCol.aggregate([
             {
+                $project: {
+                    _id: 0,
+                    'activitys.timestampMs': 1,
+                    'activitys.activities.type': 1,
+                    'activitys.activities.confidence': 1
+                }
+            },
+            {
+                $unwind: '$activitys'
+            },
+            {
+                $unwind: '$activitys.activities'
+            },
+            {
                 $match: {
-                    activitys: {
-                        $elemMatch: {
-                            activities: {
-                                $elemMatch: {
-                                    type: 'onBicycle'
-                                }
-                            }
-                        }
-                    }
+                    'activitys.activities.type': 'onBicycle'
                 }
             }
         ]);
@@ -78,13 +85,19 @@ function filterData(db, rawCol) {
         filtered.toArray(function (err, filteredData) {
             test.equal(null, err);
             // test(filteredData.length > 0);
-            // console.dir(filteredData);
+            console.log(util.inspect(filteredData, {
+                showHidden: false,
+                depth: null,
+                colors: true
+            }));
 
             filteredCol.insertMany(filteredData, function (err, r) {
                 test.equal(null, err);
                 test.equal(filteredData.length, r.insertedCount);
+
+
                 console.log(r.insertedCount + ' records inserted.');
-                groupByDate(db, filteredCol);
+                process.exit();
             });
         });
 
@@ -101,7 +114,17 @@ function filterData(db, rawCol) {
  * @param MongoDB.Collection filteredCol - The collection we are operating on
  */
 function groupByDate(db, filteredCol) {
+    process.exit();
+    // Using JS approach - TODO: Maybe try aggregation method ($unwind) later
+    filteredCol.find().toArray(function (err, docs) {
+        var lastTime = 0;
+        test.equal(null, err);
+        for (var i = 0; i < docs.length; i++) {
+            console.log(docs[i]);
+            var act1 = docs[i].activitys; // Not a typo!!
 
+        }
+    });
 }
 
 /* Main entry point */
@@ -122,7 +145,11 @@ MongoClient.connect(C.mongoURL, function (err, db) {
 
     });
     //*/
-    // filterData(db, rawCol); // Remove this line when reading from the file
+    // Remove this section when reading from the file
+    filterData(db, rawCol);
+    //var filteredCol = db.collection('filteredData');
+
+    // groupByDate(db, filteredCol);
     //*/
 
 });
