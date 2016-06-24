@@ -59,7 +59,8 @@ function filterData(db, rawCol) {
     filteredCol.deleteMany({}, function (err) {
         test.equal(err, null);
 
-        // Insert into the filtered collection any records with onBicycle
+        // Create an aggregation pipeline to isolate only the useful fields,
+        // including only records with onBicycle, above the given minimum confidence
         var filtered = rawCol.aggregate([
             {
                 $project: {
@@ -79,25 +80,39 @@ function filterData(db, rawCol) {
                 $match: {
                     'activitys.activities.type': 'onBicycle'
                 }
+            },
+            {
+                '$match': {
+                    'activitys.activities.confidence': {
+                        $gte: C.minConfidence
+                    }
+                }
+            },
+            {
+                $project: {
+                    'timestampMs': '$activitys.timestampMs',
+                    'confidence': '$activitys.activities.confidence'
+                }
             }
         ]);
 
+        // Insert into the filtered collection any records with onBicycle
+        // TODO: Chunking
         filtered.toArray(function (err, filteredData) {
             test.equal(null, err);
             // test(filteredData.length > 0);
-            console.log(util.inspect(filteredData, {
+/*            console.log(util.inspect(filteredData, {
                 showHidden: false,
                 depth: null,
                 colors: true
             }));
-
+*/
             filteredCol.insertMany(filteredData, function (err, r) {
                 test.equal(null, err);
                 test.equal(filteredData.length, r.insertedCount);
 
-
                 console.log(r.insertedCount + ' records inserted.');
-                process.exit();
+                appendDateTime(db, filteredCol);
             });
         });
 
@@ -105,17 +120,79 @@ function filterData(db, rawCol) {
 }
 
 /**
+ *
+ * getDate(timestampMs)
+ *
+ * Helper function to get the date from a timestampMS (ms since the epoch as string)
+ *
+ * @param string timestampMs: The timestampMs to process
+ */
+function getDate(timestampMs) {
+    var t = parseInt(timestampMs, 10);
+    var d = new Date(t);
+    return d.toDateString();
+}
+
+/**
+ *
+ * getDate(timestampMs)
+ *
+ * Helper function to get the date from a timestampMS (ms since the epoch as string)
+ *
+ * @param string timestampMs: The timestampMs to process
+ */
+function getTime(timestampMs) {
+    var t = parseInt(timestampMs, 10);
+    var d = new Date(t);
+    return d.toTimeString();
+}
+
+
+/**
+ * appendDateTime(db, filteredCol)
+ *
+ * Append the date and time to each record in filteredCol
+ *
+ * @param MongoDB.Db db: The database in which to store the results
+ * @param MongoDB.Collection filteredCol - The collection we are operating on
+ */
+function appendDateTime(db, filteredCol) {
+    filteredCol.count(function (err, count) {
+        var updated = 0;
+        filteredCol.find().snapshot().forEach(function (doc) {
+            filteredCol.updateOne({
+                _id: doc._id
+            }, {
+                $set: {
+                    'Date': getDate(doc.timestampMs),
+                    'Time': getTime(doc.timestampMs)
+                }
+            }, function (err, r) {
+                test.equal(null, err);
+
+                updated++;
+                if(updated == count) {
+                    process.exit(); // Next jump off point
+                }
+            });
+
+        });
+
+    });
+
+}
+
+
+/**
  * groupByDate(db, filteredCol)
  *
  * Create a collection grouped by date
- * TODO: flatten and filter ONLY onBicycle events
  *
  * @param MongoDB.Db db: The database in which to store the results
  * @param MongoDB.Collection filteredCol - The collection we are operating on
  */
 function groupByDate(db, filteredCol) {
-    process.exit();
-    // Using JS approach - TODO: Maybe try aggregation method ($unwind) later
+    // Using JS approach
     filteredCol.find().toArray(function (err, docs) {
         var lastTime = 0;
         test.equal(null, err);
@@ -145,11 +222,11 @@ MongoClient.connect(C.mongoURL, function (err, db) {
 
     });
     //*/
-    // Remove this section when reading from the file
+    // TODO: Remove this section when reading from the file
     filterData(db, rawCol);
-    //var filteredCol = db.collection('filteredData');
+    // var filteredCol = db.collection('filteredData');
 
-    // groupByDate(db, filteredCol);
+    // appendDateTime(db, filteredCol);
     //*/
 
 });
