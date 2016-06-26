@@ -7,7 +7,7 @@ var util = require('util'),
 
 /* GLOBALS - CONSTANTS */
 var C = {};
-C.fileName = '\\data\\gCycle-data\\Takeout\\Location History\\test.json';
+C.fileName = '..\\..\\gCycleData\\Takeout\\Location History\\test.json';
 C.mongoURL = 'mongodb://localhost:27017/gCycle';
 C.minIntervalForNew = 3600000; // One hour
 C.minConfidence = 1;
@@ -31,11 +31,13 @@ function readFile(fileName, db, rawCol) {
             rawCol.insertMany(data, function (err, r) {
                 test.equal(null, err);
                 test.equal(data.length, r.insertedCount);
+                console.log(r.insertedCount + ' records added.');
+                filterData(db, rawCol);
             });
         })
         .once('end', function () {
-            console.log('Done.');
-            filterData(db, rawCol);
+            console.log('[Reading file] Done.');
+
         });
 }
 
@@ -61,6 +63,7 @@ function filterData(db, rawCol) {
 
         // Create an aggregation pipeline to isolate only the useful fields,
         // including only records with onBicycle, above the given minimum confidence
+        // TODO: Handle empty set
         var filtered = rawCol.aggregate([
             {
                 $project: {
@@ -94,28 +97,43 @@ function filterData(db, rawCol) {
                     'confidence': '$activitys.activities.confidence'
                 }
             }
+            //*/
         ]);
 
         // Insert into the filtered collection any records with onBicycle
         // TODO: Chunking
         filtered.toArray(function (err, filteredData) {
             test.equal(null, err);
-            // test(filteredData.length > 0);
-/*            console.log(util.inspect(filteredData, {
+            test(filteredData.length > 0);
+            /*
+            console.log(util.inspect(filteredData, {
                 showHidden: false,
                 depth: null,
                 colors: true
             }));
 */
+
             filteredCol.insertMany(filteredData, function (err, r) {
                 test.equal(null, err);
                 test.equal(filteredData.length, r.insertedCount);
 
                 console.log(r.insertedCount + ' records inserted.');
-                appendDateTime(db, filteredCol);
+                console.log('Indexing...');
+
+                // Create an index on timestampMs - for sorting later
+                filteredCol.createIndex('timestampMs', {
+                    w: 1
+                }, function (err, indexName) {
+                    test.equal(null, err);
+                    test.equal('timestampMs_1', indexName);
+
+                    appendDateTime(db, filteredCol);
+
+                });
+
+
             });
         });
-
     });
 }
 
@@ -157,6 +175,7 @@ function getTime(timestampMs) {
  * @param MongoDB.Collection filteredCol - The collection we are operating on
  */
 function appendDateTime(db, filteredCol) {
+    console.log('Adding date and time...');
     filteredCol.count(function (err, count) {
         var updated = 0;
         filteredCol.find().snapshot().forEach(function (doc) {
@@ -171,8 +190,8 @@ function appendDateTime(db, filteredCol) {
                 test.equal(null, err);
 
                 updated++;
-                if(updated == count) {
-                    process.exit(); // Next jump off point
+                if (updated == count) {
+//                    process.exit(); // Next jump off point
                 }
             });
 
@@ -212,9 +231,9 @@ MongoClient.connect(C.mongoURL, function (err, db) {
     // Access the desired collection
     var rawCol = db.collection('rawData');
 
-    /* TODO: SKIPPING FOR NOW!
+    /* TODO: SKIPPING FOR NOW! */
     // Delete all records, then if all is well add the new records
-    console.log("Deleting records...");
+    console.log('Deleting records...');
     rawCol.deleteMany({}, function (err) {
         test.equal(null, err);
 
@@ -223,7 +242,7 @@ MongoClient.connect(C.mongoURL, function (err, db) {
     });
     //*/
     // TODO: Remove this section when reading from the file
-    filterData(db, rawCol);
+    // filterData(db, rawCol);
     // var filteredCol = db.collection('filteredData');
 
     // appendDateTime(db, filteredCol);
