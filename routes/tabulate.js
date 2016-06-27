@@ -10,7 +10,8 @@ var C = {};
 C.fileName = '..\\..\\gCycleData\\Takeout\\Location History\\test.json';
 C.mongoURL = 'mongodb://localhost:27017/gCycle';
 C.minIntervalForNew = 3600000; // One hour
-C.minConfidence = 1;
+C.minute = 60000; // One minute
+C.minConfidence = 50;
 
 
 /**
@@ -143,11 +144,10 @@ function filterData(db, rawCol) {
  *
  * Helper function to get the date from a timestampMS (ms since the epoch as string)
  *
- * @param string timestampMs: The timestampMs to process
+ * @param int timestampMs: The timestampMs to process
  */
 function getDate(timestampMs) {
-    var t = parseInt(timestampMs, 10);
-    var d = new Date(t);
+    var d = new Date(timestampMs);
     return d.toDateString();
 }
 
@@ -157,11 +157,10 @@ function getDate(timestampMs) {
  *
  * Helper function to get the date from a timestampMS (ms since the epoch as string)
  *
- * @param string timestampMs: The timestampMs to process
+ * @param int timestampMs: The timestampMs to process
  */
 function getTime(timestampMs) {
-    var t = parseInt(timestampMs, 10);
-    var d = new Date(t);
+    var d = new Date(timestampMs);
     return d.toTimeString();
 }
 
@@ -179,19 +178,22 @@ function appendDateTime(db, filteredCol) {
     filteredCol.count(function (err, count) {
         var updated = 0;
         filteredCol.find().snapshot().forEach(function (doc) {
+            // Convert to numeric
+            var timestampMs = parseInt(doc.timestampMs, 10);
             filteredCol.updateOne({
                 _id: doc._id
             }, {
                 $set: {
-                    'Date': getDate(doc.timestampMs),
-                    'Time': getTime(doc.timestampMs)
+                    'timestampMs': timestampMs,
+                    'Date': getDate(timestampMs),
+                    'Time': getTime(timestampMs)
                 }
             }, function (err, r) {
                 test.equal(null, err);
 
                 updated++;
-                if (updated == count) {
-//                    process.exit(); // Next jump off point
+                if (updated === count) {
+                    groupByTrip(db, filteredCol);
                 }
             });
 
@@ -203,23 +205,81 @@ function appendDateTime(db, filteredCol) {
 
 
 /**
- * groupByDate(db, filteredCol)
+ * completeRide(ride, lastTime)
  *
- * Create a collection grouped by date
+ * Helper function to complete a ride definition to be pushed to the results array
+ *
+ * @param object completeRide: The ride object to be completed
+ * @param object lastTime: the previous timestamp (now the end time of the ride)
+ * @returns object The modified ride object
+ */
+function completeRide(ride, lastTime) {
+    var d = new Date(lastTime);
+
+    // Set end time of ride to the last recorded time
+    ride.endTimeMs = lastTime;
+    ride.endTime = d.toTimeString();
+
+    // Calculate duration in ms and minutes
+    ride.duration = lastTime - ride.startTimeMs;
+    ride.minutes = ride.duration / C.minute;
+    return ride;
+}
+
+
+/**
+ * groupByTrip(db, filteredCol)
+ *
+ * Create a collection grouped by trip by using the minIntervalForNew as delimiter
  *
  * @param MongoDB.Db db: The database in which to store the results
- * @param MongoDB.Collection filteredCol - The collection we are operating on
+ * @param MongoDB.Collection filteredCol: The collection we are operating on
  */
-function groupByDate(db, filteredCol) {
+function groupByTrip(db, filteredCol) {
     // Using JS approach
-    filteredCol.find().toArray(function (err, docs) {
-        var lastTime = 0;
+    console.log('Grouping by ride...');
+    filteredCol.find().sort({
+        timestampMs: 1
+    }).toArray(function (err, docs) {
+        var lastTime = 0,
+            results = [],
+            ride = {},
+            d;
         test.equal(null, err);
         for (var i = 0; i < docs.length; i++) {
-            console.log(docs[i]);
-            var act1 = docs[i].activitys; // Not a typo!!
+            var newTime = docs[i].timestampMs;
 
+            if (newTime - lastTime > C.minIntervalForNew) {
+                // Close off the previous ride, if any and push to array
+                if (ride && ride.hasOwnProperty('startTime')) {
+                    ride = completeRide(ride, lastTime);
+                    if (ride.duration > 0) {
+                        results.push(ride);
+                    }
+                    ride = {};
+                }
+                // Initiate the new ride
+                ride.date = docs[i].Date;
+                ride.startTimeMs = newTime;
+                d = new Date(ride.startTimeMs);
+                ride.startTime = d.toTimeString();
+
+            }
+            lastTime = newTime;
         }
+        if (ride && ride.hasOwnProperty('startTime')) {
+            ride = completeRide(ride, lastTime);
+            if (ride.duration > 0) {
+                results.push(ride);
+            }
+        }
+
+        console.dir(results, {
+            showHidden: false,
+            depth: null,
+            colors: true
+        });
+        process.exit(); /////////////////////
     });
 }
 
@@ -231,7 +291,7 @@ MongoClient.connect(C.mongoURL, function (err, db) {
     // Access the desired collection
     var rawCol = db.collection('rawData');
 
-    /* TODO: SKIPPING FOR NOW! */
+    /* TODO: SKIPPING FOR NOW!
     // Delete all records, then if all is well add the new records
     console.log('Deleting records...');
     rawCol.deleteMany({}, function (err) {
@@ -243,9 +303,12 @@ MongoClient.connect(C.mongoURL, function (err, db) {
     //*/
     // TODO: Remove this section when reading from the file
     // filterData(db, rawCol);
-    // var filteredCol = db.collection('filteredData');
+    var filteredCol = db.collection('filteredData');
 
     // appendDateTime(db, filteredCol);
+
+    groupByTrip(db, filteredCol);
+
     //*/
 
 });
