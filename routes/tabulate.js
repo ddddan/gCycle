@@ -1,3 +1,4 @@
+console.time('overall');
 /* PACKAGES */
 var util = require('util'),
     fs = require('fs'),
@@ -11,7 +12,7 @@ C.fileName = '..\\..\\gCycleData\\Takeout\\Location History\\test.json';
 C.mongoURL = 'mongodb://localhost:27017/gCycle';
 C.minIntervalForNew = 3600000; // One hour
 C.minute = 60000; // One minute
-C.minConfidence = 50;
+C.minConfidence = 33;
 
 
 /**
@@ -263,9 +264,14 @@ function groupByTrip(db, filteredCol) {
                 ride.startTimeMs = newTime;
                 d = new Date(ride.startTimeMs);
                 ride.startTime = d.toTimeString();
-
+                ride.points = [];
             }
             lastTime = newTime;
+            var point = {
+                timestampMs: newTime,
+                confidence: docs[i].confidence
+            };
+            ride.points.push(point);
         }
         if (ride && ride.hasOwnProperty('startTime')) {
             ride = completeRide(ride, lastTime);
@@ -273,12 +279,15 @@ function groupByTrip(db, filteredCol) {
                 results.push(ride);
             }
         }
-
-        console.dir(results, {
-            showHidden: false,
-            depth: null,
-            colors: true
-        });
+        /*
+                console.dir(results, {
+                    showHidden: false,
+                    depth: null,
+                    // colors: true
+                });
+        */
+        console.log(results.length + ' rides identified.');
+        console.timeEnd('overall');
         process.exit(); /////////////////////
     });
 }
@@ -302,12 +311,12 @@ MongoClient.connect(C.mongoURL, function (err, db) {
     });
     //*/
     // TODO: Remove this section when reading from the file
-    // filterData(db, rawCol);
-    var filteredCol = db.collection('filteredData');
+    filterData(db, rawCol);
+    // var filteredCol = db.collection('filteredData');
 
     // appendDateTime(db, filteredCol);
 
-    groupByTrip(db, filteredCol);
+    // groupByTrip(db, filteredCol);
 
     //*/
 
