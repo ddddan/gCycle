@@ -18,9 +18,9 @@ C.minConfidence = 33;
 /**
  * readFile(fileName) - Read the file into memory
  *
- * @param string fileName: The file to read
- * @param MongoDB.Db db: The database in which to store the results
- * @param MongoDB.Collection rawCol: The collection in which to store the results
+ * @param {string} fileName: The file to read
+ * @param {MongoDB.Db} db: The database in which to store the results
+ * @param {MongoDB.Collection} rawCol: The collection in which to store the results
  *
  * @return object: A reduced data set
  */
@@ -49,8 +49,8 @@ function readFile(fileName, db, rawCol) {
  *
  * Filter results - We only want records with onBicycle 'activitys'
  *
- * @param MongoDB.Db db: The database in which to store the results
- * @param MongoDB.Collection rawCol - The collection we are operating on
+ * @param {MongoDB.Db} db: The database in which to store the results
+ * @param {MongoDB.Collection} rawCol - The collection we are operating on
  *
  */
 function filterData(db, rawCol) {
@@ -145,7 +145,7 @@ function filterData(db, rawCol) {
  *
  * Helper function to get the date from a timestampMS (ms since the epoch as string)
  *
- * @param int timestampMs: The timestampMs to process
+ * @param {int} timestampMs: The timestampMs to process
  */
 function getDate(timestampMs) {
     var d = new Date(timestampMs);
@@ -158,7 +158,7 @@ function getDate(timestampMs) {
  *
  * Helper function to get the date from a timestampMS (ms since the epoch as string)
  *
- * @param int timestampMs: The timestampMs to process
+ * @param {int} timestampMs: The timestampMs to process
  */
 function getTime(timestampMs) {
     var d = new Date(timestampMs);
@@ -171,8 +171,8 @@ function getTime(timestampMs) {
  *
  * Append the date and time to each record in filteredCol
  *
- * @param MongoDB.Db db: The database in which to store the results
- * @param MongoDB.Collection filteredCol - The collection we are operating on
+ * @param {MongoDB.Db} db: The database in which to store the results
+ * @param {MongoDB.Collection} filteredCol - The collection we are operating on
  */
 function appendDateTime(db, filteredCol) {
     console.log('Adding date and time...');
@@ -210,9 +210,9 @@ function appendDateTime(db, filteredCol) {
  *
  * Helper function to complete a ride definition to be pushed to the results array
  *
- * @param object completeRide: The ride object to be completed
- * @param object lastTime: the previous timestamp (now the end time of the ride)
- * @returns object The modified ride object
+ * @param {object} completeRide: The ride object to be completed
+ * @param {object} lastTime: the previous timestamp (now the end time of the ride)
+ * @returns {object} The modified ride object
  */
 function completeRide(ride, lastTime) {
     var d = new Date(lastTime);
@@ -233,8 +233,8 @@ function completeRide(ride, lastTime) {
  *
  * Create a collection grouped by trip by using the minIntervalForNew as delimiter
  *
- * @param MongoDB.Db db: The database in which to store the results
- * @param MongoDB.Collection filteredCol: The collection we are operating on
+ * @param {MongoDB.Db} db: The database in which to store the results
+ * @param {MongoDB.Collection} filteredCol: The collection we are operating on
  */
 function groupByTrip(db, filteredCol) {
     // Using JS approach
