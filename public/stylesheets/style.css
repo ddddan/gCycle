@@ -53,19 +53,21 @@ th, td {
 
 td {
     height: 2em;
-    text-align: center;
+    text-align: right;
+    padding-right: 1em;
+    width: 0;
 }
 
 td.date {
-    min-width: 6em;
+
 }
 
 td.start,
 td.end {
-    min-width: 4em;
+
 }
 
 
 td.prob {
-    width: 50%;
+
 }
