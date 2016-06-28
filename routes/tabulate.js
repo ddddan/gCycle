@@ -83,26 +83,42 @@ var tabulate = function (req, res, next) {
                     }
             },
                 {
+                    $match: {
+                        'activitys.activities.type': 'onBicycle'
+                    }
+            },
+                {
                     $unwind: '$activitys'
             },
                 {
                     $unwind: '$activitys.activities'
             },
+                /* TODO: Create a separate aggregation pipeline to do this and then merge.
+                {
+                    $group: {
+                        _id: '$activitys.timestampMs',
+                        maxConfidence: {
+                            $max: '$activitys.activities.confidence'
+                        },
+                    }
+                }, */
+
                 {
                     $match: {
                         'activitys.activities.type': 'onBicycle'
                     }
-            },
+                            },
                 {
                     '$match': {
                         'activitys.activities.confidence': {
                             $gte: C.minConfidence
                         }
                     }
-            },
+                            },
                 {
                     $project: {
                         'timestampMs': '$activitys.timestampMs',
+                        'type': '$activitys.activities.type',
                         'confidence': '$activitys.activities.confidence'
                     }
             }
@@ -114,13 +130,11 @@ var tabulate = function (req, res, next) {
             filtered.toArray(function (err, filteredData) {
                 test.equal(null, err);
                 test(filteredData.length > 0);
-                /*
-            console.log(util.inspect(filteredData, {
-                showHidden: false,
-                depth: null,
-                colors: true
-            }));
-*/
+
+                /* TESTING ONLY!!!!
+                res.json(filteredData.slice(0, 20));
+                next();
+                //*/
 
                 filteredCol.insertMany(filteredData, function (err, r) {
                     test.equal(null, err);
@@ -342,13 +356,23 @@ var tabulate = function (req, res, next) {
 module.exports = tabulate;
 
 // For testing purposes ONLY!!!
-/*
-tabulate({
-    options: {
-        noReload: 1,
-        minConfidence: 30
-    }
-}, {}, function next() {
-    process.exit();
-});
-*/
+if (require.main === module) {
+    tabulate({
+        body: {
+            options: {
+                noReload: 1,
+                minConfidence: 30
+            }
+        }
+    }, {
+        json: function (data) {
+            console.dir(data, {
+                showHidden: false,
+                depth: null,
+                colors: true
+            });
+        },
+    }, function next() {
+        process.exit();
+    });
+}
