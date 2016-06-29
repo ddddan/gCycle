@@ -133,7 +133,6 @@ var tabulate = function (req, res, next) {
 
                 /* TESTING ONLY!!!!
                 res.json(filteredData.slice(0, 20));
-                next();
                 //*/
 
                 filteredCol.insertMany(filteredData, function (err, r) {
@@ -310,7 +309,6 @@ var tabulate = function (req, res, next) {
             console.log(results.length + ' rides identified.');
             console.timeEnd('overall');
             res.json(results);
-            next();
         });
     }
 
@@ -341,7 +339,9 @@ var tabulate = function (req, res, next) {
             rawCol.deleteMany({}, function (err) {
                 test.equal(null, err);
 
-                readFile(C.fileName, db, rawCol);
+                var fileName = (opts.hasOwnProperty('fileName') ? opts.fileName: C.fileName);
+
+                readFile(fileName, db, rawCol);
 
             });
         } else {
@@ -357,12 +357,21 @@ module.exports = tabulate;
 
 // For testing purposes ONLY!!!
 if (require.main === module) {
+    var options = {
+        noReload: 1,
+        minConfidence: 30,
+        fileName: '..\\..\\gCycleData\\Takeout\\Location History\\test.json'
+    };
+
+    var args = process.argv.slice(2);
+    for (var i = 0; i < args.length; i++) {
+        if (args[i] === '--reload' || args[i] === '-r') {
+            options.noReload = 0;
+        }
+    }
     tabulate({
         body: {
-            options: {
-                noReload: 1,
-                minConfidence: 30
-            }
+            options: options
         }
     }, {
         json: function (data) {
@@ -371,6 +380,7 @@ if (require.main === module) {
                 depth: null,
                 colors: true
             });
+            process.exit();
         },
     }, function next() {
         process.exit();
