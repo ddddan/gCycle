@@ -75,64 +75,77 @@ var tabulate = function (req, res, next) {
             // TODO: Handle empty set
             var filtered = rawCol.aggregate([
                 {
+                    // Only locations with activity 'onBicycle'
+                    $match: {
+                        'activitys.activities.type': 'onBicycle'
+                    }
+                },
+                // Project only required fields
+                {
                     $project: {
                         _id: 0,
                         'activitys.timestampMs': 1,
                         'activitys.activities.type': 1,
                         'activitys.activities.confidence': 1
                     }
-            },
-                {
-                    $match: {
-                        'activitys.activities.type': 'onBicycle'
-                    }
-            },
+                },
+                // Flatten
                 {
                     $unwind: '$activitys'
-            },
-                {
-                    $unwind: '$activitys.activities'
-            },
-                /* TODO: Create a separate aggregation pipeline to do this and then merge.
-                {
-                    $group: {
-                        _id: '$activitys.timestampMs',
-                        maxConfidence: {
-                            $max: '$activitys.activities.confidence'
-                        },
-                    }
-                }, */
-
-                {
-                    $match: {
-                        'activitys.activities.type': 'onBicycle'
-                    }
                             },
                 {
-                    '$match': {
-                        'activitys.activities.confidence': {
-                            $gte: C.minConfidence
-                        }
-                    }
+                    $unwind: '$activitys.activities'
                             },
                 {
                     $project: {
-                        'timestampMs': '$activitys.timestampMs',
-                        'type': '$activitys.activities.type',
-                        'confidence': '$activitys.activities.confidence'
+                        timestampMs: '$activitys.timestampMs',
+                        type: '$activitys.activities.type',
+                        confidence: '$activitys.activities.confidence'
                     }
-            }
-            //*/
+                },
+                // Sort by decreasing confidence level
+                {
+                    $sort: {
+                        timestampMs: 1,
+                        confidence: -1
+                    }
+                },
+                // Take the first record from each timestamp (max confidence)
+                {
+                    $group: {
+                        _id: '$timestampMs',
+                        type: {
+                            $first: '$type'
+                        },
+                        confidence: {
+                            $first: '$confidence'
+                        }
+                    }
+                },
+                // Remove any records that are not 'onBicycle'
+                {
+                    $match: {
+                        'type': 'onBicycle'
+                    }
+                },
+                // Project to rename '_id' to 'timestampMs'
+                {
+                    $project: {
+                        timestampMs: '$_id',
+                        type: 1,
+                        confidence: 1
+                    }
+                }
+
         ]);
 
             // Insert into the filtered collection any records with onBicycle
-            // TODO: Chunking
             filtered.toArray(function (err, filteredData) {
                 test.equal(null, err);
                 test(filteredData.length > 0);
 
-                /* TESTING ONLY!!!!
-                res.json(filteredData.slice(0, 20));
+                /* TESTING ONLY!!!! */
+                // res.json(filteredData.slice(0, 20));
                 //*/
 
                 filteredCol.insertMany(filteredData, function (err, r) {
@@ -158,6 +171,7 @@ var tabulate = function (req, res, next) {
             });
         });
     }
+
 
     /**
      *
@@ -339,7 +353,7 @@ var tabulate = function (req, res, next) {
             rawCol.deleteMany({}, function (err) {
                 test.equal(null, err);
 
-                var fileName = (opts.hasOwnProperty('fileName') ? opts.fileName: C.fileName);
+                var fileName = (opts.hasOwnProperty('fileName') ? opts.fileName : C.fileName);
 
                 readFile(fileName, db, rawCol);
 
