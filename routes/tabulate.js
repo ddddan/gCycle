@@ -15,7 +15,7 @@ var tabulate = function (req, res, next) {
 
     /* GLOBALS - CONSTANTS */
     var C = {};
-    C.fileName = '..\\gCycleData\\Takeout\\Location History\\test.json';
+    C.fileName = '..\\gCycleData\\Takeout\\Location History\\LocationHistory.json';
     C.mongoURL = 'mongodb://localhost:27017/gCycle';
     C.minIntervalForNew = 3600000; // One hour
     C.minute = 60000; // One minute
@@ -137,7 +137,9 @@ var tabulate = function (req, res, next) {
                     }
                 }
 
-        ]);
+        ], {
+                allowDiskUse: true
+            });
 
             // Insert into the filtered collection any records with onBicycle
             filtered.toArray(function (err, filteredData) {
@@ -330,11 +332,15 @@ var tabulate = function (req, res, next) {
     var opts = {};
     if (req.body.hasOwnProperty('options')) {
         opts = req.body.options;
-        if (opts.hasOwnProperty('minConfidence')) {
-            C.minConfidence = opts.minConfidence;
-        }
+    } else if (req.query.hasOwnProperty('noReload')) {
+        // Allow this parameter in the query string
+        opts.noReload = req.query.noReload;
     }
 
+    /* REMOVE */
+    //opts.fileName = '..\\gCycleData\\Takeout\\Location History\\LocationHistory.json';
+    //opts.noReload = 0;
+    /* END REMOVE */
 
     MongoClient.connect(C.mongoURL, function (err, db) {
 

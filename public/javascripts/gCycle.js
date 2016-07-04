@@ -1,5 +1,6 @@
 /* gCycle.js - Client side functionality */
 
+var scriptData = {};
 
 function addCell(eTR, value, className) {
     eTD = document.createElement('td');
@@ -46,8 +47,8 @@ function addConfidenceGraph(eTD, confArray) {
     //var sliceWidth = (C.rightBound - C.leftBound) / confArray.length;
     for (var i = 0; i < confArray.length - 1; i++) {
         // var leftBound = i * sliceWidth + C.leftBound;
-        var leftBound = ((confArray[i].timestampMs - confArray[0].timestampMs) / (confArray[confArray.length-1].timestampMs - confArray[0].timestampMs)) * C.innerWidth + C.leftBound;
-        var sliceWidth = ((confArray[i+1].timestampMs - confArray[i].timestampMs) / (confArray[confArray.length-1].timestampMs - confArray[0].timestampMs)) * C.innerWidth;
+        var leftBound = ((confArray[i].timestampMs - confArray[0].timestampMs) / (confArray[confArray.length - 1].timestampMs - confArray[0].timestampMs)) * C.innerWidth + C.leftBound;
+        var sliceWidth = ((confArray[i + 1].timestampMs - confArray[i].timestampMs) / (confArray[confArray.length - 1].timestampMs - confArray[0].timestampMs)) * C.innerWidth;
         ctx.fillStyle = C.colorMap[Math.round(confArray[i].confidence / C.colorMap.length)];
         ctx.fillRect(leftBound, C.top, sliceWidth, C.bottom - C.top);
     }
@@ -77,14 +78,14 @@ function updateTable(data) {
         // Convert to 12 hour time
         h = d.getHours();
         amPm = (h >= 12 ? 'PM' : 'AM');
-        h12 = (h == 0 ? 12 : h % 12);
+        h12 = ((h + 11) % 12) + 1;
         addCell(eTR, (h12 + ':' + ('0' + d.getMinutes()).slice(-2) + ' ' + amPm), 'result start');
         // End time
         d = new Date(data[i].endTimeMs);
         // Convert to 12 hour time
         h = d.getHours();
         amPm = (h >= 12 ? 'PM' : 'AM');
-        h12 = (h == 0 ? 12 : h % 12);
+        h12 = ((h + 11) % 12) + 1;
         addCell(eTR, (h12 + ':' + ('0' + d.getMinutes()).slice(-2) + ' ' + amPm), 'result end');
         // Duration
         addCell(eTR, Math.round(data[i].minutes * 10) / 10, 'result duration');
@@ -95,19 +96,35 @@ function updateTable(data) {
     }
 }
 
-function getData() {
+function getData(forceReload) {
+    if (scriptData.requestSent === true) {
+        // Try to prevent multiple requests
+        return;
+    }
     // AJAX request to get the data
     var x = new XMLHttpRequest();
-    x.open('GET', 'get-data', true);
+    var params = '';
+    if (forceReload === true) {
+        params = '?noReload=0';
+    }
+    x.open('GET', 'get-data' + params, true);
     x.onreadystatechange = function respond() {
         if (x.readyState === 4 && x.status === 200) {
             var data = JSON.parse(x.responseText);
             updateTable(data);
+            scriptData.requestSent = false;
         }
     };
     x.send();
+    scriptData.requestSent = true;
+}
+
+function forceReload() {
+    getData(true);
 }
 
 window.onload = function () {
+    scriptData.requestSent = false;
     getData();
+    document.getElementById('refresh').addEventListener('click', forceReload);
 };
